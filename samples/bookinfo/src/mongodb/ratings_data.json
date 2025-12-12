@@ -1,2 +1,14 @@
-{rating: 5}
-{rating: 4}
+[
+  {
+    "productId": 1,
+    "ratings": { "Reviewer1": 5, "Reviewer2": 4, "Reviewer3": 5, "Reviewer4": 5, "Reviewer5": 3, "Reviewer6": 3 }
+  },
+  {
+    "productId": 2,
+    "ratings": { "Reviewer1": 5, "Reviewer2": 5, "Reviewer3": 5, "Reviewer4": 2, "Reviewer5": 3, "Reviewer6": 5 }
+  },
+    {
+        "productId": 3,
+        "ratings": { "Reviewer1": 5, "Reviewer2": 4, "Reviewer3": 4, "Reviewer4": 5, "Reviewer5": 2, "Reviewer6": 4 }
+    }
+]

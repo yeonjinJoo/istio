@@ -33,6 +33,11 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.StringReader;
 
+import com.mongodb.client.*;
+import org.bson.Document;
+import static com.mongodb.client.model.Filters.eq;
+import java.util.*;
+
 @Path("/")
 public class LibertyRestEndpoint extends Application {
 
@@ -44,6 +49,16 @@ public class LibertyRestEndpoint extends Application {
     private final static String ratings_service = String.format("http://%s%s:%s/ratings", ratings_hostname, services_domain, ratings_port);
     private final static String pod_hostname = System.getenv("HOSTNAME");
     private final static String clustername = System.getenv("CLUSTER_NAME");
+
+    // mongoDB 설정
+    private static final String mongoUrl = System.getenv("MONGO_DB_URL") == null ? "mongodb://mongodb:27017" : System.getenv("MONGO_DB_URL");
+    private static final String mongoDbName = "test"; // script.sh와 동일
+
+    private static final MongoClient mongoClient = MongoClients.create(mongoUrl);
+    private static final MongoDatabase mongoDb = mongoClient.getDatabase(mongoDbName);
+    private static final MongoCollection<Document> reviewsCollection = mongoDb.getCollection("reviews");
+
+
     // HTTP headers to propagate for distributed tracing are documented at
     // https://istio.io/docs/tasks/telemetry/distributed-tracing/overview/#trace-context-propagation
     private final static String[] headers_to_propagate = {
@@ -142,6 +157,71 @@ public class LibertyRestEndpoint extends Application {
     	return result;
     }
 
+    // 새로운 getJsonResponse 메서드 - MongoDB에서 리뷰를 가져와 JSON 응답 생성
+    private String buildJsonResponse(String productId,
+                                    List<Document> reviewDocs,
+                                    int[] stars) 
+    {
+        StringBuilder result = new StringBuilder();
+        result.append("{");
+        result.append("\"id\": \"").append(productId).append("\",");
+        result.append("\"podname\": \"").append(pod_hostname).append("\",");
+        result.append("\"clustername\": \"").append(clustername).append("\",");
+
+        result.append("\"reviews\": [");
+
+        for (int i = 0; i < reviewDocs.size(); i++) {
+            Document doc = reviewDocs.get(i);
+            String reviewer = doc.getString("reviewer");
+            String text = doc.getString("text");
+            int star = (stars != null && i < stars.length) ? stars[i] : -1;
+
+            result.append("{");
+            result.append("\"reviewer\": \"").append(reviewer).append("\",");
+            result.append("\"text\": \"").append(escapeJson(text)).append("\"");
+
+            if (ratings_enabled) {
+                if (star != -1) {
+                    result.append(", \"rating\": {\"stars\": ")
+                          .append(star)
+                          .append(", \"color\": \"")
+                          .append(star_color)
+                          .append("\"}");
+                } else {
+                    result.append(", \"rating\": {\"error\": \"Ratings service is currently unavailable\"}");
+                }
+            }
+
+            result.append("}");
+            if (i < reviewDocs.size() - 1) {
+                result.append(",");
+            }
+        }
+
+        result.append("]");
+        result.append("}");
+
+        return result.toString();
+    }
+
+    private String escapeJson(String text) {
+        return text == null ? "" : text.replace("\"", "\\\"");
+    }
+
+    // MongoDB에서 해당 productId에 대한 리뷰 2개를 랜덤으로 가져오는 메서드
+    private List<Document> getRandomTwoReviewsForProduct(int productId) {
+      List<Document> reviews = new ArrayList<>();
+      reviewsCollection.find(eq("productId", productId)).into(reviews);
+
+      if (reviews.isEmpty()) {
+          return Collections.emptyList();
+      }
+
+      Collections.shuffle(reviews); // 순서 랜덤 섞기
+      int count = Math.min(2, reviews.size());
+      return reviews.subList(0, count);
+    }
+
     private JsonObject getRatings(String productId, HttpHeaders requestHeaders) {
       ClientBuilder cb = ClientBuilder.newBuilder();
       Integer timeout = star_color.equals("black") ? 10000 : 2500;
@@ -184,25 +264,35 @@ public class LibertyRestEndpoint extends Application {
     @GET
     @Path("/reviews/{productId}")
     public Response bookReviewsById(@PathParam("productId") int productId, @Context HttpHeaders requestHeaders) {
-      int starsReviewer1 = -1;
-      int starsReviewer2 = -1;
+      // 1. 이 productId에 대한 모든 리뷰 가져와서 랜덤으로 2개 선택
+      List<Document> selectedReviews = getRandomTwoReviewsForProduct(productId);
 
+      // 선택된 리뷰 개수만큼 별점 배열 준비 (없으면 -1)
+      int[] stars = new int[selectedReviews.size()];
+      Arrays.fill(stars, -1);
+
+      // 2. ratings service 호출해서 전체 reviewer별 rating map 가져오기
       if (ratings_enabled) {
-        JsonObject ratingsResponse = getRatings(Integer.toString(productId), requestHeaders);
-        if (ratingsResponse != null) {
-          if (ratingsResponse.containsKey("ratings")) {
-            JsonObject ratings = ratingsResponse.getJsonObject("ratings");
-            if (ratings.containsKey("Reviewer1")){
-          	  starsReviewer1 = ratings.getInt("Reviewer1");
-            }
-            if (ratings.containsKey("Reviewer2")){
-              starsReviewer2 = ratings.getInt("Reviewer2");
-            }
+          JsonObject ratingsResponse = getRatings(Integer.toString(productId), requestHeaders);
+
+          if (ratingsResponse != null && ratingsResponse.containsKey("ratings")) {
+              JsonObject ratings = ratingsResponse.getJsonObject("ratings");
+
+              // 3. 각 선택된 reviewer 이름으로 rating map에서 별점 꺼내기
+              for (int i = 0; i < selectedReviews.size(); i++) {
+                  String reviewerName = selectedReviews.get(i).getString("reviewer");
+                  if (reviewerName != null && ratings.containsKey(reviewerName)) {
+                      stars[i] = ratings.getInt(reviewerName);
+                  }
+              }
           }
-        }
       }
 
-      String jsonResStr = getJsonResponse(Integer.toString(productId), starsReviewer1, starsReviewer2);
+      String jsonResStr = buildJsonResponse(
+          Integer.toString(productId),
+          reviewDocs,
+          stars
+      );
       return Response.ok().type(MediaType.APPLICATION_JSON).entity(jsonResStr).build();
     }
 }

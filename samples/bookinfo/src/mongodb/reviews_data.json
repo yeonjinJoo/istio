@@ -1,0 +1,22 @@
+[
+  { "productId": 1, "reviewer": "Reviewer1", "text": "Fun book!" },
+  { "productId": 1, "reviewer": "Reviewer2",   "text": "Little bit difficult, but valuable." },
+  { "productId": 1, "reviewer": "Reviewer3", "text": "Explanation and example are good." },
+  { "productId": 1, "reviewer": "Reviewer4", "text": "I loved it!" },
+  { "productId": 1, "reviewer": "Reviewer5",  "text": "Not bad." },
+  { "productId": 1, "reviewer": "Reviewer6",   "text": "Could be better." },
+  
+  { "productId": 2, "reviewer": "Reviewer1", "text": "Great book!" },
+  { "productId": 2, "reviewer": "Reviewer2",   "text": "Interesting book." },
+  { "productId": 2, "reviewer": "Reviewer3", "text": "Amazing story." },
+  { "productId": 2, "reviewer": "Reviewer4",   "text": "Not my type of book." },
+  { "productId": 2, "reviewer": "Reviewer5",  "text": "It's helpful but little bit boring." },
+  { "productId": 2, "reviewer": "Reviewer6", "text": "I loved it!" },
+
+    { "productId": 3, "reviewer": "Reviewer1", "text": "A masterpiece." },
+    { "productId": 3, "reviewer": "Reviewer2", "text": "Well written." },
+    { "productId": 3, "reviewer": "Reviewer3", "text": "A bit lengthy but worth reading." },
+    { "productId": 3, "reviewer": "Reviewer4",   "text": "Could not put it down!" },
+    { "productId": 3, "reviewer": "Reviewer5",   "text": "Not my favorite." },
+    { "productId": 3, "reviewer": "Reviewer6",  "text": "Informative and engaging." }
+]
