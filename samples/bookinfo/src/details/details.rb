@@ -40,23 +40,22 @@ server.mount_proc '/health' do |req, res|
 end
 
 server.mount_proc '/details' do |req, res|
-    pathParts = req.path.split('/')
     headers = get_forward_headers(req)
-
     begin
-        begin
-          id = Integer(pathParts[-1])
-        rescue
-          raise 'please provide numeric product id'
-        end
-        details = get_book_details(id, headers)
-        res.body = details.to_json
-        res['Content-Type'] = 'application/json'
-    rescue => error
-        res.body = {'error' => error}.to_json
-        res['Content-Type'] = 'application/json'
-        res.status = 400
-    end
+    isbn = req.query['isbn']
+    raise 'isbn query parameter is required' if isbn.nil? || isbn.empty?
+
+    details = fetch_details_from_external_service(isbn)
+
+    res.body = details.to_json
+    res['Content-Type'] = 'application/json'
+    res.status = 200
+
+  rescue => error
+    res.body = { 'error' => error.to_s }.to_json
+    res['Content-Type'] = 'application/json'
+    res.status = 400
+  end
 end
 
 # TODO: provide details on different books.
@@ -65,7 +64,7 @@ def get_book_details(id, headers)
       # the ISBN of one of Comedy of Errors on the Amazon
       # that has Shakespeare as the single author
         isbn = '0486424618'
-        return fetch_details_from_external_service(isbn, id, headers)
+        return fetch_details_from_external_service(isbn)
     end
 
     return {
@@ -81,8 +80,8 @@ def get_book_details(id, headers)
     }
 end
 
-def fetch_details_from_external_service(isbn, id, headers)
-    uri = URI.parse('https://www.googleapis.com/books/v1/volumes?q=isbn:' + isbn)
+def fetch_details_from_external_service(isbn)
+    uri = URI.parse("https://www.googleapis.com/books/v1/volumes?q=isbn:#{isbn}")
     http = Net::HTTP.new(uri.host, ENV['DO_NOT_ENCRYPT'] === 'true' ? 80:443)
     http.read_timeout = 5 # seconds
 
@@ -97,29 +96,30 @@ def fetch_details_from_external_service(isbn, id, headers)
     end
 
     request = Net::HTTP::Get.new(uri.request_uri)
-    headers.each { |header, value| request[header] = value }
 
     response = http.request(request)
-
     json = JSON.parse(response.body)
+
+    raise "No book found for isbn #{isbn}" if json['totalItems'] == 0
+
     book = json['items'][0]['volumeInfo']
 
-    language = book['language'] === 'en'? 'English' : 'unknown'
-    type = book['printType'] === 'BOOK'? 'paperback' : 'unknown'
+    language = book['language'] == 'en' ? 'English' : 'unknown'
+    type = book['printType'] == 'BOOK' ? 'paperback' : 'unknown'
     isbn10 = get_isbn(book, 'ISBN_10')
     isbn13 = get_isbn(book, 'ISBN_13')
 
     return {
-        'id' => id,
-        'author': book['authors'][0],
-        'year': book['publishedDate'],
+        'isbn' => isbn,
+        'author' => book['authors']&.first,
+        'year' => book['publishedDate'],
         'type' => type,
         'pages' => book['pageCount'],
         'publisher' => book['publisher'],
         'language' => language,
         'ISBN-10' => isbn10,
         'ISBN-13' => isbn13
-  }
+    }
 
 end
 
