@@ -72,7 +72,7 @@ spec:
       serviceAccountName: bookinfo-details
       containers:
       - name: details
-        image: docker.io/istio/examples-bookinfo-details-v1:1.20.3
+        image: jooyj0529/examples-bookinfo-details-v1:test1.4
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9080
@@ -123,8 +123,16 @@ spec:
       serviceAccountName: bookinfo-ratings
       containers:
       - name: ratings
-        image: docker.io/istio/examples-bookinfo-ratings-v1:1.20.3
+        image: jooyj0529/examples-bookinfo-ratings-v1:test1.4
         imagePullPolicy: IfNotPresent
+
+        env:
+        - name: SERVICE_VERSION
+          value: "v2"
+        - name: DB_TYPE
+          value: "mongodb"
+        - name: MONGO_DB_URL
+          value: "mongodb://mongodb:27017"
         ports:
         - containerPort: 9080
 ---
@@ -152,46 +160,55 @@ metadata:
   labels:
     account: reviews
 ---
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: reviews-v1
-  labels:
-    app: reviews
-    version: v1
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: reviews
-      version: v1
-  template:
-    metadata:
-      labels:
-        app: reviews
-        version: v1
-    spec:
-      serviceAccountName: bookinfo-reviews
-      containers:
-      - name: reviews
-        image: docker.io/istio/examples-bookinfo-reviews-v1:1.20.3
-        imagePullPolicy: IfNotPresent
-        env:
-        - name: LOG_DIR
-          value: "/tmp/logs"
-        ports:
-        - containerPort: 9080
-        volumeMounts:
-        - name: tmp
-          mountPath: /tmp
-        - name: wlp-output
-          mountPath: /opt/ibm/wlp/output
-      volumes:
-      - name: wlp-output
-        emptyDir: {}
-      - name: tmp
-        emptyDir: {}
----
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: reviews-v1
+#   labels:
+#     app: reviews
+#     version: v1
+# spec:
+#   replicas: 1
+#   selector:
+#     matchLabels:
+#       app: reviews
+#       version: v1
+#   template:
+#     metadata:
+#       labels:
+#         app: reviews
+#         version: v1
+#     spec:
+#       serviceAccountName: bookinfo-reviews
+#       containers:
+#       - name: reviews
+#         image: jooyj0529/examples-bookinfo-reviews-v1:test1.4
+#         imagePullPolicy: IfNotPresent
+#         env:
+#         - name: LOG_DIR
+#           value: "/tmp/logs"
+#         - name: MONGO_DB_URL
+#           value: "mongodb://mongodb:27017"
+#         - name: ENABLE_RATINGS
+#           value: "true"
+#         - name: RATINGS_HOSTNAME
+#           value: "ratings"
+#         - name: RATINGS_SERVICE_PORT
+#           value: "9080"
+        
+#         ports:
+#         - containerPort: 9080
+#         volumeMounts:
+#         - name: tmp
+#           mountPath: /tmp
+#         - name: wlp-output
+#           mountPath: /opt/ibm/wlp/output
+#       volumes:
+#       - name: wlp-output
+#         emptyDir: {}
+#       - name: tmp
+#         emptyDir: {}
+# ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -214,11 +231,20 @@ spec:
       serviceAccountName: bookinfo-reviews
       containers:
       - name: reviews
-        image: docker.io/istio/examples-bookinfo-reviews-v2:1.20.3
+        image: jooyj0529/examples-bookinfo-reviews-v2:test1.4
         imagePullPolicy: IfNotPresent
         env:
         - name: LOG_DIR
           value: "/tmp/logs"
+        - name: MONGO_DB_URL
+          value: "mongodb://mongodb:27017"
+        - name: ENABLE_RATINGS
+          value: "true"
+        - name: RATINGS_HOSTNAME
+          value: "ratings"
+        - name: RATINGS_SERVICE_PORT
+          value: "9080"
+
         ports:
         - containerPort: 9080
         volumeMounts:
@@ -232,46 +258,55 @@ spec:
       - name: tmp
         emptyDir: {}
 ---
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: reviews-v3
-  labels:
-    app: reviews
-    version: v3
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: reviews
-      version: v3
-  template:
-    metadata:
-      labels:
-        app: reviews
-        version: v3
-    spec:
-      serviceAccountName: bookinfo-reviews
-      containers:
-      - name: reviews
-        image: docker.io/istio/examples-bookinfo-reviews-v3:1.20.3
-        imagePullPolicy: IfNotPresent
-        env:
-        - name: LOG_DIR
-          value: "/tmp/logs"
-        ports:
-        - containerPort: 9080
-        volumeMounts:
-        - name: tmp
-          mountPath: /tmp
-        - name: wlp-output
-          mountPath: /opt/ibm/wlp/output
-      volumes:
-      - name: wlp-output
-        emptyDir: {}
-      - name: tmp
-        emptyDir: {}
----
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: reviews-v3
+#   labels:
+#     app: reviews
+#     version: v3
+# spec:
+#   replicas: 1
+#   selector:
+#     matchLabels:
+#       app: reviews
+#       version: v3
+#   template:
+#     metadata:
+#       labels:
+#         app: reviews
+#         version: v3
+#     spec:
+#       serviceAccountName: bookinfo-reviews
+#       containers:
+#       - name: reviews
+#         image: jooyj0529/examples-bookinfo-reviews-v3:test1.4
+#         imagePullPolicy: IfNotPresent
+#         env:
+#         - name: LOG_DIR
+#           value: "/tmp/logs"
+#         - name: MONGO_DB_URL
+#           value: "mongodb://mongodb:27017"
+#         - name: ENABLE_RATINGS
+#           value: "true"
+#         - name: RATINGS_HOSTNAME
+#           value: "ratings"
+#         - name: RATINGS_SERVICE_PORT
+#           value: "9080"
+
+#         ports:
+#         - containerPort: 9080
+#         volumeMounts:
+#         - name: tmp
+#           mountPath: /tmp
+#         - name: wlp-output
+#           mountPath: /opt/ibm/wlp/output
+#       volumes:
+#       - name: wlp-output
+#         emptyDir: {}
+#       - name: tmp
+#         emptyDir: {}
+# ---
 ##################################################################################################
 # Productpage services
 ##################################################################################################
@@ -322,8 +357,25 @@ spec:
       serviceAccountName: bookinfo-productpage
       containers:
       - name: productpage
-        image: docker.io/istio/examples-bookinfo-productpage-v1:1.20.3
+        image: jooyj0529/examples-bookinfo-productpage-v1:test1.4
         imagePullPolicy: IfNotPresent
+        env:
+        - name: BOOKS_MYSQL_HOST
+          value: "mysqldb"
+        - name: BOOKS_MYSQL_PORT
+          value: "3306"
+        - name: BOOKS_MYSQL_USER
+          value: "root"
+        - name: BOOKS_MYSQL_PASSWORD
+          value: "password"
+        - name: USER
+          value: "productpage"
+        - name: LOGNAME
+          value: "productpage"
+        - name: HOME
+          value: "/tmp"
+
+
         ports:
         - containerPort: 9080
         volumeMounts:

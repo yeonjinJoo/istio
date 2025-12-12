@@ -146,15 +146,15 @@ dispatcher.onGet(/^\/ratings\/[0-9]*/, function (req, res) {
           console.log(err)
         } else {
           const db = client.db("test")
-          db.collection('ratings').find({}).toArray(function (err, doc) {
+          db.collection('ratings').find({}).toArray(function (err, docs) {
             if (err) {
               res.writeHead(500, {'Content-type': 'application/json'})
               res.end(JSON.stringify({error: 'could not load ratings from database'}))
               console.log(err)
             } else {
               let ratings = {}
-              if (doc && doc.ratings) {
-                ratings = doc.ratings   // { Reviewer1: 5, Reviewer2: 4, ... }
+              if (docs && docs.length > 0) {
+                ratings = docs[0].ratings   // { Reviewer1: 5, Reviewer2: 4, ... }
               }
 
               const result = {

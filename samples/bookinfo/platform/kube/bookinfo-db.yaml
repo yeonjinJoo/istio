@@ -12,6 +12,9 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+##################################################################################################
+# mongoDB database
+##################################################################################################
 apiVersion: v1
 kind: Service
 metadata:
@@ -47,7 +50,7 @@ spec:
     spec:
       containers:
       - name: mongodb 
-        image: docker.io/istio/examples-bookinfo-mongodb:1.20.3
+        image: jooyj0529/examples-bookinfo-mongodb:test1.4
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 27017
@@ -61,3 +64,146 @@ spec:
       - name: data-db
         emptyDir: {}
 ---
+##################################################################################################
+# MySQL database
+##################################################################################################
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysqldb-init
+data:
+  mysqldb-init.sql: |
+    CREATE DATABASE IF NOT EXISTS test;
+    USE test;
+
+    CREATE TABLE IF NOT EXISTS ratings (
+      ReviewID INT NOT NULL,
+      Rating INT,
+      PRIMARY KEY (ReviewID)
+    );
+
+    CREATE TABLE IF NOT EXISTS books (
+      book_id INT PRIMARY KEY,
+      title VARCHAR(255) NOT NULL,
+      isbn VARCHAR(30) NOT NULL,
+      description_html TEXT NOT NULL
+    );
+
+    INSERT INTO ratings (ReviewID, Rating) VALUES (1, 5), (2, 4)
+      ON DUPLICATE KEY UPDATE Rating=VALUES(Rating);
+
+    INSERT INTO books (book_id, title, isbn, description_html) VALUES
+    (1, 'The Comedy of Errors', '9780743484886',
+    '<a href="https://en.wikipedia.org/wiki/The_Comedy_of_Errors">Wikipedia Summary</a>: The Comedy of Errors is one of William Shakespeare''s earliest plays. It is his shortest and one of his most farcical comedies, with a major part of the humour coming from slapstick and mistaken identity, in addition to puns and word play.'),
+    (2, 'Hamlet', '074347712X',
+    '<a href="https://en.wikipedia.org/wiki/Hamlet">Wikipedia Summary</a>: The Tragedy of Hamlet, Prince of Denmark, often shortened to Hamlet (/ˈhæmlɪt/), is a tragedy written by William Shakespeare sometime between 1599 and 1601. It is Shakespeare''s longest play.'),
+    (3, 'Macbeth', '9780743482790',
+    '<a href="https://en.wikipedia.org/wiki/Macbeth">Wikipedia Summary</a>: The Tragedy of Macbeth, often shortened to Macbeth (/məkˈbɛθ/), is a tragedy by William Shakespeare, estimated to have been first performed in 1606.[a] It dramatises the physically violent and damaging psychological effects of political ambitions and power.');
+    ON DUPLICATE KEY UPDATE
+      title=VALUES(title), isbn=VALUES(isbn), description_html=VALUES(description_html);
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysqldb
+  labels:
+    app: mysqldb
+spec:
+  ports:
+  - port: 3306
+    name: mysql
+  selector:
+    app: mysqldb
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysqldb
+spec:
+  serviceName: mysqldb
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysqldb
+  template:
+    metadata:
+      labels:
+        app: mysqldb
+    spec:
+      containers:
+      - name: mysqldb
+        image: mysql:8.0
+        ports:
+        - containerPort: 3306
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "password"
+        - name: MYSQL_DATABASE
+          value: "test"
+        volumeMounts:
+        - name: mysql-data
+          mountPath: /var/lib/mysql
+        - name: mysqldb-init
+          mountPath: /docker-entrypoint-initdb.d/mysqldb-init.sql
+          subPath: mysqldb-init.sql
+      volumes:
+      - name: mysqldb-init
+        configMap:
+          name: mysqldb-init
+  volumeClaimTemplates:
+  - metadata:
+      name: mysql-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 2Gi
+---
+
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: mysqldb
+#   labels:
+#     app: mysqldb
+#     service: mysqldb
+# spec:
+#   ports:
+#   - port: 3306
+#     targetPort: 3306
+#     name: mysqldb
+#   selector:
+#     app: mysqldb
+#     version: v1
+# ---
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: mysqldb-v1
+#   labels:
+#     app: mysqldb
+#     version: v1
+# spec:
+#   replicas: 1
+#   selector:
+#     matchLabels:
+#       app: mysqldb
+#       version: v1
+#   template:
+#     metadata:
+#       labels:
+#         app: mysqldb
+#         version: v1
+#     spec:
+#       containers:
+#       - name: mysqldb
+#         image: mysql:8.0
+#         imagePullPolicy: IfNotPresent
+#         ports:
+#         - containerPort: 3306
+#         env:
+#         - name: MYSQL_ROOT_PASSWORD
+#           value: "password"
+#         - name: MYSQL_DATABASE
+#           value: "test"
+# ---

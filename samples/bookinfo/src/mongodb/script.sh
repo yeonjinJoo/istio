@@ -15,6 +15,6 @@
 # limitations under the License.
 
 set -e
-mongoimport --host localhost --db test --collection ratings --drop --file /app/data/ratings_data.json
+mongoimport --host localhost --db test --collection ratings --drop --jsonArray --file /app/data/ratings_data.json
 
-mongoimport --host localhost --db test --collection reviews --drop --file /app/data/reviews_data.json
+mongoimport --host localhost --db test --collection reviews --drop --jsonArray --file /app/data/reviews_data.json

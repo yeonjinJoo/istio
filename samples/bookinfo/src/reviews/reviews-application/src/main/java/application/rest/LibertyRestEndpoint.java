@@ -56,7 +56,23 @@ public class LibertyRestEndpoint extends Application {
 
     private static final MongoClient mongoClient = MongoClients.create(mongoUrl);
     private static final MongoDatabase mongoDb = mongoClient.getDatabase(mongoDbName);
-    private static final MongoCollection<Document> reviewsCollection = mongoDb.getCollection("reviews");
+    // private static final MongoCollection<Document> reviewsCollection;
+
+    // private static synchronized MongoCollection<Document> getReviewsCollectionOrNull() {
+
+    //     if (reviewsCollection != null) return reviewsCollection;
+
+    //     try {
+    //         mongoClient = MongoClients.create(mongoUrl);
+    //         mongoDb = mongoClient.getDatabase(mongoDbName);
+    //         reviewsCollection = mongoDb.getCollection("reviews");
+    //         return reviewsCollection;
+    //     } catch (Exception e) {
+    //         System.err.println("[Mongo] init failed: " + e);
+    //         return null;
+    //     }
+    // }
+
 
 
     // HTTP headers to propagate for distributed tracing are documented at
@@ -210,16 +226,24 @@ public class LibertyRestEndpoint extends Application {
 
     // MongoDB에서 해당 productId에 대한 리뷰 2개를 랜덤으로 가져오는 메서드
     private List<Document> getRandomTwoReviewsForProduct(int productId) {
-      List<Document> reviews = new ArrayList<>();
-      reviewsCollection.find(eq("productId", productId)).into(reviews);
+      try {
+          MongoCollection<Document> reviewsCollection = mongoDb.getCollection("reviews");
+          if (reviewsCollection == null) {
+              return Collections.emptyList();
+          }
 
-      if (reviews.isEmpty()) {
-          return Collections.emptyList();
+          List<Document> reviews = reviewsCollection.aggregate(Arrays.asList(
+              new Document("$match", new Document("productId", productId)),
+              new Document("$sample", new Document("size", 2))
+          )).into(new ArrayList<>());
+
+          if (reviews.isEmpty()) return Collections.emptyList();
+
+          return reviews;
+      } catch (Exception e) {
+          System.err.println("[Mongo] query failed: " + e);
+          return Collections.emptyList(); // query 실패
       }
-
-      Collections.shuffle(reviews); // 순서 랜덤 섞기
-      int count = Math.min(2, reviews.size());
-      return reviews.subList(0, count);
     }
 
     private JsonObject getRatings(String productId, HttpHeaders requestHeaders) {
@@ -290,7 +314,7 @@ public class LibertyRestEndpoint extends Application {
 
       String jsonResStr = buildJsonResponse(
           Integer.toString(productId),
-          reviewDocs,
+          selectedReviews,
           stars
       );
       return Response.ok().type(MediaType.APPLICATION_JSON).entity(jsonResStr).build();

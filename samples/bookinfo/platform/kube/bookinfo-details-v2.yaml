@@ -36,7 +36,7 @@ spec:
     spec:
       containers:
       - name: details
-        image: docker.io/istio/examples-bookinfo-details-v2:1.20.3
+        image: jooyj0529/examples-bookinfo-details-v2:test1.4
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9080

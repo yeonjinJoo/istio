@@ -16,4 +16,7 @@ dependencies {
     providedCompile 'javax.enterprise.concurrent:javax.enterprise.concurrent-api:1.0'
     providedCompile 'javax.enterprise:cdi-api:1.2'
     providedCompile 'io.swagger:swagger-annotations:1.5.0'
+
+    // mongoDB Java Driver
+    implementation 'org.mongodb:mongodb-driver-sync:4.11.1'
 }
