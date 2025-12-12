@@ -29,7 +29,23 @@ import os
 import requests
 import simplejson as json
 import sys
+import pymysql
 
+DB_HOST = os.getenv("BOOKS_MYSQL_HOST", "mysqldb")   # k8s 서비스명
+DB_PORT = int(os.getenv("BOOKS_MYSQL_PORT", "3306"))
+DB_USER = os.getenv("BOOKS_MYSQL_USER", "root")
+DB_PASS = os.getenv("BOOKS_MYSQL_PASSWORD", "password")
+DB_NAME = os.getenv("BOOKS_MYSQL_DB", "test")  # mysqldb-init.sql이 test DB를 만들고 있으므로
+
+def get_db_connection():
+    return pymysql.connect(
+        host=DB_HOST,
+        port=DB_PORT,
+        user=DB_USER,
+        password=DB_PASS,
+        database=DB_NAME,
+        cursorclass=pymysql.cursors.DictCursor
+    )
 
 # These two lines enable debugging at httplib level (requests->urllib3->http.client)
 # You will see the REQUEST, including HEADERS and DATA, and RESPONSE with HEADERS but without DATA.
@@ -260,7 +276,8 @@ def floodReviews(product_id, headers):
 
 @app.route('/productpage')
 def front():
-    product_id = 0  # TODO: replace default value
+    # /productpage?product_id=1과 같은 형식으로 product_id를 받는다. 기본값은 1번 책
+    product_id = int(request.args.get("product_id", 1))  # TODO: replace default value
     headers = getForwardHeaders(request)
     user = session.get('user', '')
     product = getProduct(product_id)
@@ -313,37 +330,81 @@ def metrics():
 
 
 # Data providers:
+# Returns a list of products
 def getProducts():
-    return [
-        {
-            'id': 0,
-            'title': 'The Comedy of Errors',
-            'descriptionHtml': '<a href="https://en.wikipedia.org/wiki/The_Comedy_of_Errors">Wikipedia Summary</a>: The Comedy of Errors is one of <b>William Shakespeare\'s</b> early plays. It is his shortest and one of his most farcical comedies, with a major part of the humour coming from slapstick and mistaken identity, in addition to puns and word play.'
-        }
-    ]
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT book_id, title, isbn, description_html
+                FROM books
+                ORDER BY book_id
+            """)
+            rows = cur.fetchall()
+    finally:
+        conn.close()
 
+    products = []
+    for row in rows:
+        products.append({
+            'id': row['book_id'],
+            'title': row['title'],
+            'isbn': row['isbn'],
+            'descriptionHtml': row['description_html']
+        })
+    return products
 
+# Returns a single product from the database
 def getProduct(product_id):
-    products = getProducts()
-    if product_id + 1 > len(products):
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT book_id, title, isbn, description_html
+                FROM books
+                WHERE book_id = %s
+            """, (product_id,))
+            row = cur.fetchone()
+    finally:
+        conn.close()
+
+    if not row:
         return None
-    else:
-        return products[product_id]
+
+    return {
+        'id': row['book_id'],
+        'title': row['title'],
+        'isbn': row['isbn'],
+        'descriptionHtml': row['description_html']
+    }
 
 
 def getProductDetails(product_id, headers):
+    # 1. product 정보에서 isbn 추출
+    product = getProduct(product_id)
+    if product is None:
+        return 404, {'error': 'Book not found'}
+    
+    isbn = product.get('isbn')
+    if not isbn:
+        return 500, {'error': 'ISBN not available'}
+    
+    # 2. details 서비스로 isbn 기반 호출
     try:
-        url = details['name'] + "/" + details['endpoint'] + "/" + str(product_id)
+        # /details?isbn=9780387367217 형태로 호출
+        url = f"{details['name']}/{details['endpoint']}?isbn={isbn}"
         res = send_request(url, headers=headers, timeout=3.0)
     except BaseException:
         res = None
+    
+    # 3. 정상 응답 처리
     if res and res.status_code == 200:
         request_result_counter.labels(destination_app='details', response_code=200).inc()
         return 200, res.json()
     else:
         status = res.status_code if res is not None and res.status_code else 500
         request_result_counter.labels(destination_app='details', response_code=status).inc()
-        return status, {'error': 'Sorry, product details are currently unavailable for this book.'}
+        return status, {'error': f'Sorry, product details for ISBN {isbn} are currently unavailable.'}
 
 
 def getProductReviews(product_id, headers):
